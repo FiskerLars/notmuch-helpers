@@ -1,0 +1,49 @@
+#!/bin/bash
+
+if [ $# -le 0 ] ; then 
+	echo "Usage: give filter rules in parameters"
+fi
+
+
+tags_on_is_spam=-inbox
+tgt="spam"
+
+if [ ${0} != ${0%ham} ] ; then
+        tgt="ham"
+        unset tags_on_is_spam
+fi
+
+
+notmuch search "$@"
+echo -n "Mark as ${tgt}"
+if [ $tgt == "spam" ] ; then
+        echo -n " and remove from inbox"
+fi
+echo -n "? (y/N) "
+read -n1 doit
+echo
+
+echo -n "DELETE files? (y/N) "
+read -n1 deletit
+echo
+
+
+if [ "$doit" == "y" ]; then
+    notmuch search --output=files "$@" | 
+    while read file; do
+        echo "learning ${file} as ${tgt}"
+        cat "${file}" | spamc -L $tgt 
+        if [ "$deletit" == "y" ]; then
+          rm -v "${file}"
+        fi
+    done
+    if [ "$deletit" != "y" ]; then
+        echo "tagging +${tgt}"
+	    notmuch tag +${tgt} ${tags_on_is_spam} "$@"
+    else
+        echo "update database, remove deleted files"
+        notmuch new
+    fi
+fi
+
+
